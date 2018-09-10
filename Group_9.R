@@ -1,12 +1,9 @@
-#Read in data
-customers <- read_csv("customers.csv")
-purchases <- read_csv("purchases.csv")
-registrations <- read_csv("registrations.csv")
-
+#Group_9
+#Bryce Curtsinger & Derek Shambo
 
 fitModel <- function(customers, purchases, registrations){
   #Load packages
-  library(pacman)
+  if (!require("pacman")) install.packages("pacman")  
   p_load(tidyverse)
   p_load(dplyr)
   p_load(stringr)
@@ -17,6 +14,10 @@ fitModel <- function(customers, purchases, registrations){
   p_load(zipcode)
   
   data("zipcode") #To match state to zip
+  
+  customers <- read_csv("customers.csv")
+  purchases <- read_csv("purchases.csv")
+  registrations <- read_csv("registrations.csv")
   
   #Customers not included in registrations
   customers <- customers[customers$CompanyName %in% registrations$CompanyName,] #make sure all customers are registered
@@ -48,7 +49,24 @@ fitModel <- function(customers, purchases, registrations){
   return(glmodel)
 }
 
-predictCust <- function(glmodel, newdata){
+predictCust <- function(glmodel, newregistrations){
+  
+  newdata <- 
+  newregistrations %>% 
+  select(CompanyName, CompanyAddress, RegistrationDate) %>% 
+  group_by(CompanyName, CompanyAddress) %>%
+  summarise(NumRegistered = n(), FirstRegDate = min(RegistrationDate), LastRegDate = max(RegistrationDate)) #Find #, first and last date for each co.
+  
+  #Feature ID/Engineering
+  newdata$LastRegLength <- as.integer(as_date("2016-01-01") - newdata$LastRegDate) #Difference in last registration date & first day of 2016
+  newdata$FirstRegLength <- as.integer(as_date("2016-01-01") - newdata$FirstRegDate) #Difference in first registration date & first day of 2016
+  newdata$zip <- str_extract(newdata$CompanyAddress, "\\d{5}")#Extract Zip code
+  newdata <- newdata %>% left_join(zipcode %>% select(zip, state)) #Get state from zip
+  newdata$state <- as.factor(newdata$state) #Convert to factor
+  newdata <- newdata[complete.cases(newdata$state),] #Remove NAs
+  newdata$FirstMonth <- as.factor(month(newdata$FirstRegDate))
+  newdata$LastMonth <- as.factor(month(newdata$LastRegDate))
+  
   gpred <- predict(glmodel, newdata, type = "response")
   gpred <- data.frame(ctest$CompanyName, gpred)
   return(gpred)
